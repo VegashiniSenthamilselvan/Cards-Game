@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Black Jack</title>
+    <style>
+        body {
+            background: url("backimg.jpg") no-repeat center center fixed;
+                    background-size: cover;
+                    font-family: Arial, Helvetica, sans-serif;
+                    color: white;
+                    text-align: center;
+        }
+        #dealer-cards img, #your-cards img {
+            height: 170px;
+            width: 125px;
+            margin: 5px;
+        }
+        #hit, #stay {
+            width: 100px;
+            height: 50px;
+            font-size: 20px;
+            margin: 10px;
+        }
+        #results-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+        }
+        #results {
+            font-size: 125px;
+            margin-right: 20px; /* Space between text and image */
+        }
+        h1{
+            font-size: 100px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Blackjack</h1>
+    <div id="dealer">
+        <h2>Dealer's Hand</h2>
+        <div id="dealer-cards"></div>
+        <div id="dealer-sum"></div>
+    </div>
+    <div id="player">
+        <h2>Your Hand</h2>
+        <div id="your-cards"></div>
+        <div id="your-sum"></div>
+    </div>
+    <div id="controls">
+        <button id="hit">Hit</button>
+        <button id="stay">Stay</button>
+    </div>
+    <div id="results-container">
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let dealerSum;
+        let yourSum;
+        let dealerAceCount;
+        let yourAceCount;
+        let hidden;
+        let deck;
+        let canHit = true;
+
+        window.onload = function() {
+            buildDeck();
+            shuffleDeck();
+            startGame();
+        }
+
+        function buildDeck() {
+            let values = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+            let types = ["C", "D", "H", "S"];
+            deck = [];
+
+            for (let i = 0; i < types.length; i++) {
+                for (let j = 0; j < values.length; j++) {
+                    deck.push(values[j] + "-" + types[i]);
+                }
+            }
+        }
+
+        function shuffleDeck() {
+            for (let i = 0; i < deck.length; i++) {
+                let j = Math.floor(Math.random() * deck.length);
+                let temp = deck[i];
+                deck[i] = deck[j];
+                deck[j] = temp;
+            }
+        }
+
+        function startGame() {
+            dealerSum = 0;
+            yourSum = 0;
+            dealerAceCount = 0;
+            yourAceCount = 0;
+
+            hidden = deck.pop();
+            dealerSum += getValue(hidden);
+            dealerAceCount += checkAce(hidden);
+
+            // Deal two cards to the dealer
+            for (let i = 0; i < 2; i++) {
+                let card = deck.pop();
+                dealerSum += getValue(card);
+                dealerAceCount += checkAce(card);
+                let cardImg = document.createElement("img");
+                cardImg.src = "./cards/" + card + ".png";
+                document.getElementById("dealer-cards").append(cardImg);
+            }
+
+            // Deal two cards to the player
+            for (let i = 0; i < 2; i++) {
+                let card = deck.pop();
+                yourSum += getValue(card);
+                yourAceCount += checkAce(card);
+                let cardImg = document.createElement("img");
+                cardImg.src = "./cards/" + card + ".png";
+                document.getElementById("your-cards").append(cardImg);
+            }
+
+            document.getElementById("hit").addEventListener("click", hit);
+            document.getElementById("stay").addEventListener("click", stay);
+        }
+
+        function stay() {
+            // Reduce aces for dealer and player
+            dealerSum = reduceAce(dealerSum, dealerAceCount);
+            yourSum = reduceAce(yourSum, yourAceCount);
+
+            // Disable hitting
+            canHit = false;
+
+            // Show dealer's hidden card
+            let hiddenCardImg = document.createElement("img");
+            hiddenCardImg.src = "./cards/" + hidden + ".png";
+            document.getElementById("dealer-cards").append(hiddenCardImg);
+
+            // Dealer plays
+            dealerPlay();
+
+            // Determine the result message
+            let message = "";
+            if (yourSum > 21) {
+                message = "You Lose!";
+            } else if (dealerSum > 21) {
+                message = "You Win!";
+            } else if (yourSum > dealerSum) {
+                message = "You Win!";
+            } else if (yourSum < dealerSum) {
+                message = "You Lose!";
+            } else {
+                message = "Tie!";
+            }
+
+            // Update results
+            document.getElementById("dealer-sum").innerText = dealerSum;
+            document.getElementById("your-sum").innerText = yourSum;
+            document.getElementById("results").innerText = message;
+        }
+
+        function dealerPlay() {
+            while (dealerSum < 17 || (dealerSum === 17 && dealerAceCount > 0)) {
+                let card = deck.pop();
+                dealerSum += getValue(card);
+                dealerAceCount += checkAce(card);
+                let cardImg = document.createElement("img");
+                cardImg.src = "./cards/" + card + ".png";
+                document.getElementById("dealer-cards").append(cardImg);
+            }
+            dealerSum = reduceAce(dealerSum, dealerAceCount);
+        }
+
+        function hit() {
+            if (!canHit) {
+                return;
+            }
+
+            let card = deck.pop();
+            if (!card) {
+                console.error('No more cards in the deck!');
+                return;
+            }
+
+            yourSum += getValue(card);
+            yourAceCount += checkAce(card);
+
+            let cardImg = document.createElement("img");
+            cardImg.src = "./cards/" + card + ".png";
+
+            document.getElementById("your-cards").append(cardImg);
+
+            let reducedSum = reduceAce(yourSum, yourAceCount);
+            document.getElementById("your-sum").innerText = reducedSum;
+
+            if (reducedSum > 21) {
+                canHit = false;
+                stay();
+            }
+        }
+
+        function getValue(card) {
+            let value = card.split("-")[0];
+            if (isNaN(value)) {
+                if (value === "A") {
+                    return 11;
+                }
+                return 10;
+            }
+            return parseInt(value);
+        }
+
+        function checkAce(card) {
+            if (card[0] === "A") {
+                return 1;
+            }
+            return 0;
+        }
+
+        function reduceAce(playerSum, playerAceCount) {
+            while (playerSum > 21 && playerAceCount > 0) {
+                playerSum -= 10;
+                playerAceCount -= 1;
+            }
+            return playerSum;
+        }
+    </script>
+</body>
+</html>
